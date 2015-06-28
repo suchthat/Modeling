@@ -1,0 +1,146 @@
+---
+title: "Chutes and ladder"
+author: "Fanny Dos Reis"
+date:
+output: pdf_document
+---
+
+
+\abstract{In this document, I model the famous board game "Chutes And Ladders". I investigate how long the game lasts.}
+
+\section{Modeling}
+Let's start with simulating the games:
+
+The players take turn, throw a dice and move forward the number indicated on the dice. The player wins if he reaches the square 100. There are special squares. If the player lands at the bottom of a ladder, he climb the ladder and advanced to that square. If the player lands at the top of a slide, he slides down to a lower level square.
+
+The function in R that moves the pawn down the slide or up the ladder:
+```{r}
+ChutesLadder <-function(position) 
+  {if (position == 4) {position <- 14}
+   if (position == 9) {position <- 31}
+   if (position == 16){position <- 6}
+   if (position == 21){position <- 42}
+   if (position == 28){position <- 84}
+   if (position == 36){position <- 44}
+   if (position == 49){position <- 11}
+   if (position == 48){position <- 26}
+   if (position == 51){position <- 67}
+   if (position == 56){position <- 53}
+   if (position == 62){position <- 19}
+   if (position == 64){position <- 60}
+   if (position == 71){position <- 91}
+   if (position == 80){position <-100}
+   if (position == 87){position <- 24}
+   if (position == 93){position <- 73}
+   if (position == 95){position <- 75}
+   if (position == 98){position  <- 78}
+   position
+}
+
+```
+Each turn of the player is simulated as followed:
+
+```{r}
+play <- function(position)
+ {dice <-sample(1:6,1)
+  if (position+dice<=100)
+  {position <-position+dice}
+  position <- ChutesLadder(position)
+  position}
+```
+
+Looks like we are ready to play!
+
+\section{How long will a game last?}
+
+I was first interested in the distribution of the number of turns per game.
+
+```{r}
+numberofturn <- function()
+{ 
+  position <- 0
+  nturn <-0
+  while (position <100)
+  {position <-play(position)  
+  nturn<-nturn+1
+  }
+nturn
+}
+```
+
+The number of turns, \tt{turn} to win the game follows the following distribution:
+```{r}
+nexperiment <- 100000
+turn <- replicate(nexperiment, {numberofturn()})
+
+par(mfrow = c(1,2))
+hist(turn, prob= TRUE)
+hist(log(turn), prob = TRUE)
+
+```
+The distribution of the number of turns to reach the square 100 is right skewed but the logarithm of the distribution is centered around 3.5. I investigate a log-normal modernization. 
+
+Let's consider the distribution of sample mean and sample variance to determine the parameters of the distribution of the number of turns:
+```{r}
+nexp <- 5000
+nsample <-5000
+meanvarianceofsample<-function(nexp)
+    {sample <-replicate(nexp,{numberofturn()})
+    c(mean(log(sample)),var(log(sample)))}
+samplemeanvariance <-replicate(nsample,{meanvarianceofsample(nexp)})
+par(mfrow =c(1,2))
+hist(samplemeanvariance[1,], main ="Distribution of sample mean", xlab="Sample mean")
+hist(samplemeanvariance[2,], main = "Distribution of sample variance",xlab="Sample variance")
+``` 
+
+As expected, the distribution as a bell shape centered at the mean and at the variance. We store the main parameters.
+
+```{r}
+Mean <- mean(samplemeanvariance[1,])
+Mean
+SD <-sqrt(median(samplemeanvariance[2,]))
+SD
+
+```
+The distribution of number of turn is pretty close to the log-normal density with parameters Mean and SD.
+```{r}
+lognormal<- function(x){
+  1/(x*SD*sqrt(2*pi))*exp(-(log(x)-Mean)^2/(2*SD^2)) }
+
+x<-seq(from=0, to=200,by=2 )
+hist(turn,prob=TRUE, ylim=c(0,0.025), nclass=30)
+lines(x, lognormal(x),lty =20, col="red")
+```
+\section{Hypothesis Testing}
+I would like to evaluate how good the log-normal model is. I run a new simulation of the number of turns to obtain a second sample called new simulation. I compare the Q-Q plot of a log-normal model with parameters Mean and SD, the distribution of our initial number of turn distribution, turn, and the distribution of the second simulation new simulation. We observe that the plot is extremely close to the identity line. The model fit the distribution where the two sumulations agrees.
+
+```{r}
+newsimulation <- replicate(nexp,{numberofturn()})
+model <- rlnorm(nexp,Mean,SD)
+par(mfrow=c(1,3))
+qqplot(newsimulation,turn)
+lines(x,x,lty = 20, col = "red")
+qqplot(model,turn)
+lines(x,x,lty = 20, col = "red")
+qqplot(model,newsimulation)
+lines(x,x,lty = 20, col = "red")
+```
+\section{Conclusion}
+By modeling the number of turns with a log-normal distribution with parameters Mean and SD, we can conclude that 
+on average, each player needs to play
+```{r}
+exp(Mean+SD^2/2)
+```
+turns before reaching the square 100.
+The median number of turns is 
+```{r}
+exp(Mean)
+```
+
+95% of the games will last between 
+```{r}
+c(exp(Mean-1.96*SD),exp(Mean+1.96*SD))
+```
+turns.
+
+Are you ready to play?
